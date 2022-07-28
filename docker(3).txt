@@ -1,0 +1,782 @@
+Window 10 环境下安装Docker
+Docker for Win10 安装包下载地址：
+https://store.docker.com/editions/community/docker-ce-desktop-windows
+
+国内镜像加速
+https://registry.docker-cn.com #Docker中国区
+http://hub-mirror.c.163.com #网易
+
+
+Linux Centos7环境下安装Docker
+安装环境：Centos 7
+安装条件：docker官方要求linux内核至少3.8以上，建议3.10以上
+
+Docker 版本：
+docker EE 企业版本
+docker CE 社区版本
+
+配置yum 源和时间同步及关闭防火墙及selinux还有swap
+
+cd /etc/yum.repos.d/
+mkdir repo
+ mv *.repo repo/
+curl -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-7.repo
+yum makecache
+yum -y install wget
+wget -O /etc/yum.repos.d/epel.repo http://mirrors.aliyun.com/repo/epel-7.repo
+yum makecache
+yum -y install ntpdate
+ntpdate time.windows.com
+cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+yum install -y net-tools lftp rsync psmisc vim-enhanced tree   bash-completion createrepo lrzsz iproute　gcc gcc-c++ git wget
+yum -y install yum-utils device-mapper-persistent-data lvm2
+yum makecache
+yum repolist
+systemctl stop firewalld
+systemctl disable firewalld
+setenforce 0
+sed -i 's/enforcing/disabled/' /etc/selinux/config
+swapoff -a
+vim /etc/fstab
+#
+vim /etc/hosts
+
+wget https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+
+yum makecache
+yum repolist
+
+安装docker CE
+yum install -y  docker-ce
+
+启动docker服务并设置开机启动
+systemctl start docker
+systemctl enable docker
+
+
+Docker镜像的搜索下载以及查看删除实战
+
+查看版本：docker version
+查看详细信息：docker info
+查看本地镜像：docker images
+搜索镜像：docker search centos
+搜索镜像并过滤是官方的： docker search --filter "is-official=true" centos
+搜索镜像并过滤大于多少颗星星的：docker search --filter stars=10 centos
+下载centos7镜像：docker pull centos:7
+修改本地镜像名字（小写）：docker tag centos:7 mycentos:1
+本地镜像的删除：docker rmi centos:7
+
+
+Docker核心基础之配置阿里云镜像加速
+阿里云镜像加速器配置地址：https://cr.console.aliyun.com/cn-shenzhen/instances/mirrors
+
+配置步骤：vi /etc/docker/daemon.json
+{
+  "registry-mirrors": ["https://rqd4on43.mirror.aliyuncs.com"]
+}
+
+
+重启：systemctl daemon-reload && systemctl restart docker
+
+
+
+Docker容器的创建，查看，停止，重启等
+
+构建容器：docker run -itd --name=mycentos centos:7
+
+-i ：表示以交互模式运行容器（让容器的标准输入保持打开）
+-d：表示后台运行容器，并返回容器ID
+-t：为容器重新分配一个伪输入终端
+-name：为容器指定名称
+
+查看本地所有的容器：docker ps -a
+查看本地正在运行的容器：docker ps
+停止容器：docker stop CONTAINER_ID / CONTAINER_NAME
+一次性停止所有容器：docker stop $(docker ps -a -q)
+启动容器：docker start CONTAINER_ID / CONTAINER_NAME
+重启容器：docker restart CONTAINER_ID / CONTAINER_NAME
+删除容器：docker rm CONTAINER_ID / CONTAINER_NAME
+强制删除容器：docker rm -f CONTAINER_ID / CONTAINER_NAME
+查看容器详细信息：docker inspect CONTAINER_ID / CONTAINER_NAME
+进入容器：docker exec -it 0ad5d7b2c3a4 /bin/bash
+
+
+
+容器与宿主机之间文件复制与挂载
+
+从宿主机复制到容器：docker cp 宿主机本地路径 容器名字/ID：容器路径
+docker cp /root/123.txt mycentos:/home/
+
+从容器复制到宿主机：docker cp 容器名字/ID：容器路径 宿主机本地路径
+docker cp mycentos:/home/456.txt /root
+
+宿主机文件夹挂载到容器里：docker run -itd -v 宿主机路径:容器路径 镜像ID
+docker run -itd -v /root/xdclass/:/home centos:7
+
+
+
+Docker核心必备之自定义镜像实战
+
+docker目前镜像的制作有俩种方法：
+基于Docker Commit制作镜像
+基于dockerfile制作镜像，Dockerfile方式为主流的制作镜像方式
+
+Commit构建自定义镜像
+简介：对容器的修改以及保存
+
+启动并进入容器：docker run -it centos:7 /bin/bash
+在/home 路径下创建xdclass文件夹：mkdir /home/xdclass
+安装ifconfig命令：yum -y install net-tools
+重启容器，查看容器的xdclass文件夹还在不在：docker restart 67862569d4f7
+删除容器，再重新启动一个容器进入查看有没有xdclass文件夹：docker rm 67862569d4f7 && docker
+run -it centos:7 /bin/bash
+
+构建镜像：
+docker commit 4eb9d14ebb18 mycentos:7
+docker commit -a "XD" -m "mkdir /home/xdclass" 4eb9d14ebb18 mcentos:7
+-a：标注作者
+-m：说明注释
+查看详细信息：docker inspect 180176be1b4c
+启动容器：docker run -itd 180176be1b4c /bin/bash
+进入容器查看：docker exec -it 2a4d38eca64f /bin/bash
+
+
+核心必备知识之Dockerfile构建镜像实战
+
+Dockerfile构建镜像实战
+
+Dockerfile
+
+# this is a dockerfile
+FROM centos:7
+MAINTAINER XD 123456@qq.com
+RUN echo "正在构建镜像！！！"
+WORKDIR /home/xdclass
+COPY 123.txt /home/xdclass
+RUN yum install -y net-tools
+
+构建：docker build -t mycentos:v2 .
+查看：docker images
+进入验证：验证成功
+
+总结：
+共享资源
+对容器的任何改动都是发生容器层
+容器层是可写可读，而镜像层只读
+
+
+不得不掌握的Dockerfile基础指令
+
+简介：介绍一些常用的Dockerfile指令
+
+FROM
+基于哪个镜像
+MAINTAINER
+注明作者
+COPY
+复制文件进入镜像（只能用相对路径，不能用绝对路径）
+ADD
+复制文件进入镜像（假如文件是.tar.gz文件会解压）
+WORKDIR：
+指定工作目录，假如路径不存在会创建路径
+ENV
+设置环境变量
+EXPOSE
+暴露容器端口
+RUN
+在构建镜像的时候执行，作用于镜像层面
+ENTRYPOINT
+在容器启动的时候执行，作用于容器层，dockerfile里有多条时只允许执行最后一条
+CMD
+在容器启动的时候执行，作用于容器层，dockerfile里有多条时只允许执行最后一条
+容器启动后执行默认的命令或者参数，允许被修改
+命令格式：
+shell命令格式：RUN yum install -y net-tools
+exec命令格式：RUN [ "yum","install" ,"-y" ,"net-tools"]
+
+dockerfile
+3.6 实战系列之Dockerfile构建JAVA网站镜像
+简介：Dockerfile构建java环境
+本地宿主机配置jdk
+
+#第一个
+FROM centos:7
+RUN echo "images building!"
+CMD ["echo","container","starting..."]
+ENTRYPOINT ["echo","container","starting ！！！"]
+#第二个
+FROM centos:7
+RUN echo "images building!"
+CMD ["echo","containe1r","starting..."]
+CMD ["echo","container2","starting..."]
+ENTRYPOINT ["echo","container2","starting ！！！"]
+ENTRYPOINT ["echo","container2","starting ！！！"]
+#第三个
+FROM centos:7
+CMD ["-ef"]
+ENTRYPOINT ["ps"]
+
+
+实战系列之Dockerfile构建JAVA网站镜像
+Dockerfile构建java环境
+
+vi /etc/profile 最下面
+本地宿主机配置jdk
+export JAVA_HOME=/usr/local/jdk
+export JRE_HOME=$JAVA_HOME/jre
+export CLASSPATH=$JAVA_HOME/lib:$JRE_HOME/lib:$CLASSPATH
+export PATH=$JAVA_HOME/bin:$JRE_HOME/bin:$PATH
+
+vi /etc/profile
+source /etc/profile
+检验：java -version
+dockerfile
+
+[root@docker tomcat]# cat dockerfile 
+FROM centos:7
+ADD jdk-8u211-linux-x64.tar.gz /usr/local
+RUN mv /usr/local/jdk1.8.0_211 /usr/local/jdk
+ENV JAVA_HOME=/usr/local/jdk
+ENV JRE_HOME=$JAVA_HOME/jre
+ENV CLASSPATH=$JAVA_HOME/lib:$JRE_HOME/lib:$CLASSPATH
+ENV PATH=$JAVA_HOME/bin:$JRE_HOME/bin:$PATH
+ADD apache-tomcat-8.5.35.tar.gz /usr/local
+RUN mv /usr/local/apache-tomcat-8.5.35 /usr/local/tomcat
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/tomcat/bin/catalina.sh","run"]
+
+
+制作java环境镜像：
+docker build -t  mycentos:java .
+
+启动容器：并指定/root/test/ROOT 为网站目录
+docker run -itd --name javaweb -p 80:8080 -v /root/test/ROOT:/usr/local/tomcat/webapps/ROOT mycentos:java /bin/bash
+
+网页进行访问验证
+
+
+实战系列之Dockerfile构建nginx镜像
+Dockerfile构建nginx
+
+dockerfile
+
+FROM centos:7
+ADD nginx-1.16.0.tar.gz /usr/local
+COPY nginx_install.sh /usr/local
+RUN sh /usr/local/nginx_install.sh
+EXPOSE 80
+
+安装nginx的shell脚本
+#!/bin/bash
+yum install -y gcc gcc-c++ make pcre pcre-devel zlib zlib-devel
+cd /usr/local/nginx-1.16.0
+./configure --prefix=/usr/local/nginx && make && make install
+
+制作Nginx镜像：
+docker build -t mycentos:nginx .
+
+Nginx镜像启动注意
+在容器里nginx是以daemon方式启动，退出容器时，nginx程序也会随着停止：
+/usr/local/nginx/sbin/nginx
+使用前台方式永久运行：/usr/local/nginx/sbin/nginx -g "daemon off;"
+
+检查验证：
+docker run -itd --name nginxweb -p 88:80 mycentos:nginx /usr/local/nginx/sbin/nginx -g "daemon off;"
+
+实战系列之Dockerfile构建redis镜像
+Dockerfile构建redis
+
+编写redis编译安装shell脚本redis_install.sh
+#!/bin/bash
+yum install -y gcc gcc-c++ make openssl openssl-devel
+cd /home/redis-4.0.9
+make && make PREFIX=/usr/local/redis install
+mkdir -p /usr/local/redis/conf/
+cp /home/redis-4.0.9/redis.conf /usr/local/redis/conf/
+sed -i '69s/bind 127.0.0.1/bind 0.0.0.0/' /usr/local/redis/conf/redis.conf
+sed -i '88s/protected-mode yes/protected-mode no/' /usr/local/redis/conf/redis.conf
+
+编写Dockerfile
+FROM centos:7
+ADD redis-4.0.9.tar.gz /home
+COPY redis_install.sh /home
+RUN sh /home/redis_install.sh
+ENTRYPOINT /usr/local/redis/bin/redis-server /usr/local/redis/conf/redis.conf
+
+
+制作redis镜像：
+docker build -t mycentos:redis .
+
+测试redis：
+测试redis：
+启动容器：docker run -itd --name redis -p 6380:6379 mycentos:redis #6380是宿主机端口，6379是容器的端口
+进入容器：docker exec -it redis /bin/bash
+宿主机连接redis： /usr/local/redis/bin/redis-cli -p 6380
+如果不行再改一下容器里面的redis的配置文件
+
+
+验证：
+[root@localhost home]# /usr/local/redis/bin/redis-cli -p 6380
+127.0.0.1:6380> set name xdclass
+OK
+127.0.0.1:6380> get name
+"xdclass"
+127.0.0.1:6380>
+
+
+实战系列之docker快速部署mysql数据库并初始化
+
+Dockerfile快速部署mysql数据库并初始化
+官方网址：
+https://hub.docker.com/
+启动命令：
+docker run --name some-mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD=abc123456 -d mysql:5.7
+进入容器命令：
+docker exec -it some-mysql env LANG=C.UTF-8 /bin/bash
+
+dockerfile 这个要看官网的简介来写有的不一样
+
+
+FROM mysql:5.7
+WORKDIR /docker-entrypoint-initdb.d
+ENV LANG=C.UTF-8
+ADD init.sql .
+
+docker build -t mydb:5.7 .
+
+初始化sql语句：
+-- 建库
+create database `db_student`;
+SET character_set_client = utf8;
+use db_student;
+-- 建表
+drop table if exists `user`;
+CREATE TABLE user (
+id tinyint(5) zerofill auto_increment not null comment '学生学号',
+name varchar(20) default null comment '学生姓名',
+age tinyint default null comment '学生年龄',
+class varchar(20) default null comment '学生班级',
+sex char(5) not null comment '学生性别',
+unique key (id)
+)engine=innodb charset=utf8;
+-- 插入数据
+insert into user values('1','小明','15','初三','男');
+insert into user values('2','小红','13','初二','女');
+insert into user values('3','小东','14','初一','男');
+insert into user values('4','小西','12','初二','男');
+
+
+Docker核心知识之网络模式与特权指令
+
+简介：介绍Docker网络模式
+
+默认的三种网络模式：
+bridge：桥接模式
+host：主机模式
+none：无网络模式
+
+查看网络模式：
+docker network ls
+
+Docker 容器的bridge模式实战演练
+
+简介：介绍Docker桥接网络模式
+桥接模式是docker 的默认网络设置，当Docker服务启动时，会在主机上创建一个名为docker0的虚拟网桥，并
+选择一个和宿主机不同的IP地址和子网分配给docker0网桥
+
+安装工具：
+yum -y install net-tools
+yum install -y bridge-utils
+
+查看桥接情况：
+brctl show
+
+[root@localhost ~]# brctl show
+bridge name bridge id STP enabled interfaces
+docker0 8000.0242055f4af6 no veth60d950c
+veth827b88f
+vethaabef5c
+vethd22be73
+vethe1396d2
+
+
+Docker 容器的host模式实战演练
+
+简介：介绍Docker主机网络模式
+host 模式：该模式下容器是不会拥有自己的ip地址，而是使用宿主机的ip地址和端口。
+
+启动nginx容器命令并防火墙放开80端口：
+docker run -d --net=host mycentos:nginx /usr/local/nginx/sbin/nginx -g "daemon off;"
+firewall-cmd --zone=public --add-port=80/tcp --permanent
+firewall-cmd --reload
+
+Docker 容器的none模式介绍
+简介：介绍Docker关闭网络模式介绍
+none模式：关闭模式
+无法连外网
+
+Docker 容器间基于Link实现单向通信
+
+简介：介绍基于link单向通信
+
+启动mysql数据库容器：
+docker run --name mydb -e MYSQL_ROOT_PASSWORD=abc123456 -d mysql:5.7
+
+启动tomcat应用容器并link到mysql数据库：
+docker run -itd --name tomcat1 --link mydb tomcat:tag
+
+注意：mydb 这个容器一定要存在！
+官方版的mysql 5.7 需要安装工具才有ping命令:
+apt-get update && apt-get install iputils-ping
+
+Docker容器间利用brige网桥实现双向通信
+
+简介：介绍基于Bridge网桥实现双向通信
+执行：docker network ls
+
+[root@localhost ~]# docker network ls
+NETWORK ID NAME DRIVER SCOPE
+b6875f7a18dc bridge bridge local
+aa7e5dc89e49 host host local
+b6ac4684d54d my_bridge bridge local
+2d1450c05ce0 none null local
+
+创建一个新的网桥：docker network create -d bridge my_bridge
+启动第一个容器：docker run -itd --name tomcat centos:7
+启动第二个容器：docker run -itd --name redis centos:7
+把第一个容器加入网桥：docker network connect my_bridge tomcat
+把第二个容器加入网桥：docker network connect my_bridge redis
+最后分别进入俩个容器中进行验证
+
+Docker容器的特权模式介绍
+
+简介：介绍特权模式
+
+启动一个普通的容器
+docker run -itd --name mycentos centos:7 /bin/bash
+安装网络工具：
+yum -y install net-tools
+执行route -n
+删除网关：
+route del default gw 172.17.0.1
+
+启动拥有特权模式的容器：
+docker run -itd --privileged=true --name mycentos1 centos:7 /bin/bash
+进入容器：
+docker exec -it ef /bin/bash
+删除网关
+route del default gw 172.17.0.1
+成功
+备注：特权模式用的比较少
+
+4.8 Docker核心知识之Volume数据共享
+
+简介：Volume的介绍使用
+
+dockerfile
+FROM centos:7
+VOLUME ["/usr/local"]
+
+注意：在dockerfile里设置volume是无法修改宿主机的挂载路径的
+
+
+使用volume容器共享创建nginx集群
+使用--volumes-from 实现容器与容器之间volume共享
+创建nginx1
+docker run -itd -p 8080:80 -v /usr/local/nginx/html:/usr/local/nginx/html --name nginx1
+mycentos:nginx /usr/local/nginx/sbin/nginx -g "daemon off;"
+创建nginx2
+docker run -itd -p 8081:80 --volumes-from nginx1 --name nginx2 mycentos:nginx
+/usr/local/nginx/sbin/nginx -g "daemon off;"
+创建nginx3
+docker run -itd -p 8082:80 --volumes-from nginx1 --name nginx3 mycentos:nginx
+/usr/local/nginx/sbin/nginx -g "daemon off;"
+对/usr/local/nginx/html/index.html进行修改
+打开浏览器进行访问测试
+使用docker inspect 容器ID 可以查看详细的挂载信息
+
+
+第五章：实战系列之利用Compose操作容器
+
+简介：Compose的介绍
+docker-compose：是一个用于定义和运行多容器 Docker 的应用程序工具，可以帮助我们可以轻松、高效的管
+理容器
+compose的安装
+安装pip工具
+yum install -y epel-release
+yum install -y python-pip
+安装docker-compose
+pip install  -i https://mirrors.aliyun.com/pypi/simple docker-compose==1.24.1  阿里源
+pip install -i https://github.com/docker/compose/releases/download/ docker-compose==1.24.1
+或者
+pip install  docker-compose==1.24.1  官网
+
+或者yum -y install docker-compose
+
+
+查看docker-compose版本：
+docker-compose version
+
+安装pip报错解决：
+1. Contact the upstream for the repository and get them to fix the problem.
+2. Reconfigure the baseurl/etc. for the repository, to point to a working
+upstream. This is most often useful if you are using a newer
+distribution release than is supported by the repository (and the
+packages for the previous distribution release still work).
+3. Disable the repository, so yum won't use it by default. Yum will then
+just ignore the repository until you permanently enable it again or use
+--enablerepo for temporary usage:
+yum-config-manager --disable <repoid>
+4. Configure the failing repository to be skipped, if it is unavailable.
+Note that yum will try to contact the repo. when it runs most commands,
+so will have to try and fail each time (and thus. yum will be be much
+slower). If it is a very temporary problem though, this is often a nice
+compromise:
+yum-config-manager --save --setopt=<repoid>.skip_if_unavailable=true
+Cannot retrieve metalink for repository: epel/x86_64. Please verify its path and
+try again
+
+解决： vi /etc/yum.repos.d/epel.repo 修改配置文件，注释掉metalink ，取消注释 baseurl
+
+
+5.2 实用工具Docker-Compose的快速上手
+
+简介：Compose快速上手
+编写一个最最简单的yml
+version: '3'
+services:
+  redis: 
+    image: mycentos:redis
+
+
+compose操作容器（一定要进入配置文件目录）
+后台启动容器：docker-compose up -d
+查看容器运行情况：docker-compose ps
+停止并删除容器：docker-compose down
+停止并删除容器并删除volume：docker-compose down --volumes
+停止启动容器：docker-compose stop；docker-compose start
+docker-compose exec的使用：docker-compose exec redis bash
+
+总结：
+操作docker-compose一定要在配置文件docker-compose.yml文件路径下操作
+格式一定要注意，该空格要空格
+
+
+5.3 实用工具Docker-Compose核实用技能
+简介：Compose核心实用技能掌握
+docker-compose.yml的三大部分：version，services，networks，最关键是services和networks两个部分
+compose设置网络模式
+compose使用端口映射
+compose设置文件共享
+compose管理多个容器
+
+docker-compose.yml
+
+默认是桥接
+version: '3'
+services:
+  nginx:
+    image: mycentos:nginx
+    ports:
+    - "8080:80"
+    volumes:
+    - /home:/usr/local/nginx/html
+    - /var/logs/nginx/logs:/usr/local/nginx/logs
+    command: /usr/local/nginx/sbin/nginx -g "daemon off;"
+  redis:
+    image: mycentos:redis
+    ports:
+    - "6380:6379"
+
+主机模式
+version: '3'
+services:
+  nginx:
+    image: mycentos:nginx
+    network_mode: "host"
+    volumes:
+    - /home:/usr/local/nginx/html
+    - /var/logs/nginx/logs:/usr/local/nginx/logs
+    command: /usr/local/nginx/sbin/nginx -g "daemon off;"
+  redis:
+    image: mycentos:redis
+    ports:
+    - "6380:6379"
+
+
+5.4 实战项目篇之利用Docker-Compose快速搭建个人博客
+简介：Compose快速搭建个人博客wordpress
+官网：https://docs.docker.com/compose/wordpress/
+
+docker-compose.yml
+
+version: '3.3'
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: somewordpress
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:latest
+    ports:
+      - "8000:80"
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+volumes:
+    db_data: {}
+
+
+启动wordpress：docker-compose up -d
+打开浏览器访问：IP:8000
+进行安装配置
+将删除容器和默认网络，但会保留WordPress数据库： docker-compose down
+将删除容器，默认网络和WordPress数据库： docker-compose down --volumes
+
+5.5 实战项目篇之Docker-Compose 详细分析
+简介：分析上节课docker-compose.yml
+
+docker-compose.yml
+
+version: '3.3'
+services:
+  db:
+    image: mysql:5.7 #docker run -itd mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql #采用的是卷标的形式挂载（注意：- db_data是参数，可以变，自定义，必须与下面对应）
+    restart: always #自动重启，保证服务在线
+    environment:
+      MYSQL_ROOT_PASSWORD: somewordpress #指定环境变量 docker -itd -e
+      MYSQL_ROOT_PASSWORD= somewordpress
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+  wordpress:
+    depends_on:
+      - db # - db 是参数，合起来的意思是只有当上面的mysql数据库安装成功后，这个wordpress才可以被安装，还有一个功能，就是docker --link 将上面的mysql数据库，与这个wordpress应用连起来
+    image: wordpress:latest
+    ports:
+      - "8000:80"
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+volumes:
+    db_data: {}
+
+
+docker-compose中有两种方式可以设置volumes
+使用具体路径直接挂载到本地，特点就是直观
+使用卷标的形式，特点就是简洁，但是不知道数据到底在本地的什么位置。需要通过卷标查看
+docker volume ls
+docker volume inspect wordpress_db_data
+
+
+
+第六章：Docker企业核心知识之镜像仓库实战
+
+6.1 公司中Docker镜像仓库使用讲解
+简介：讲解一般公司中docker仓库的使用
+什么是镜像仓库?
+存放着很多镜像的仓库
+为什么要使用镜像仓库？
+起到备份作用
+方便其他机器下载使用
+镜像仓库的种类？我们可以大致分为俩大类：
+公共镜像仓库
+官方：https://hub.docker.com/，基于各个软件开发或者有软件提供商开发的
+非官方：其他组织或者公司开发的镜像，供大家免费使用
+私有镜像仓库
+公司自己搭建的，用于存放公司内部的镜像，自己管理，不提供给外部使用，避免了商业项目暴露出
+去的风险。
+
+6.2 阿里云镜像仓库的搭建与使用
+简介：阿里云镜像仓库
+阿里云镜像仓库申请地址：
+https://cr.console.aliyun.com/cn-shanghai/instances/repositories
+步骤：
+登录阿里云Docker Registry
+$ sudo docker login --username=穿靴子的狸花猫 registry.cn-shenzhen.aliyuncs.com
+
+将镜像推送到Registry
+$ sudo docker login --username=穿靴子的狸花猫 registry.cn-shenzhen.aliyuncs.com
+$ sudo docker tag [ImageId] registry.cn-shenzhen.aliyuncs.com/xdclassimages/mysql:
+[镜像版本号]$ sudo docker push registry.cn-shenzhen.aliyuncs.com/xdclassimages/mysql:
+[镜像版本号]
+从Registry中拉取镜像
+$ sudo docker pull registry.cn-shenzhen.aliyuncs.com/xdclassimages/mysql:[镜像版本号]
+
+
+6.3 企业核心篇幅之harbor仓库搭建
+
+简介：构建自己的镜像仓库
+安装之前确保前置条件是否满足，需要安装docker、docker-compose、openssl以及python2.7以上
+安装 yum -y install openssl
+Harbor离线版安装下载地址
+https://github.com/goharbor/harbor/releases
+上传对应安装包
+
+修改配置：harbor.yml
+
+修改主机名（注意空格）：hostname: 192.168.0.151
+修改密码（注意空格）：harbor_admin_password: Harbor12345
+
+执行脚本：sh prepare
+执行安装命令：sh install.sh
+执行命令：docker-compose ps
+访问Harbor，默认用户名admin
+关闭：docker-compose down
+启动：docker-compose up -d
+
+6.4 企业核心篇幅之harbor仓库配置与使用
+
+简介：配置与使用harbor仓库
+Docker配置使用自建仓库
+默认docker只允许访问 https仓库
+如果要访问http仓库需要自己配置
+
+配置允许访问http仓库：vi /etc/docker/daemon.json
+
+{
+"insecure-registries":["http://192.168.0.245"]
+}
+
+重启docker服务：systemctl restart docker.service
+网页上创建项目名
+登录：docker login --username=admin 192.168.0.245
+改名：docker tag mysql:5.7 192.168.0.245/jschen/mysql:5.7
+推送：docker push 192.168.0.245/jschen/mysql:5.7
+下载：docker pull 192.168.0.245/jschen/mysql:5.7
+docker login 后有一个登录凭证（可删除，下次需要密码）：
+/root/.docker/config.json （建议从安全角度出发，每次登录后进行删除）
+
+
+6.5 实战系列之本地镜像容器的载入与载出
+简介：镜像的本地载入载出
+
+俩种办法：
+保存镜像
+保存容器
+保存镜像：
+docker save cd3ed0dfff7e -o /home/mysql.tar
+docker save mysql:5.7 > /home/mysql.tar
+载入镜像：
+docker load -i mysql.tar
+保存容器：
+docker export 974b919e1fdd -o /home/mysql-export.tar
+载入容器：
+docker import mysql-export.tar
+
